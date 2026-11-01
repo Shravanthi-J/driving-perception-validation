@@ -1,0 +1,9 @@
+# This is a boilerplate parameters config generated for pipeline 'data_prep'
+# using Kedro 1.7.0.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://docs.kedro.org/en/1.7.0/configuration/parameters.html
+
+data_prep:
+  train_labels_dir: data/01_raw/bdd100k/raw_labels/train
+  val_labels_dir: data/01_raw/bdd100k/raw_labels/val

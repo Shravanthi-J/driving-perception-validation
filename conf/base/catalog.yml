@@ -1,0 +1,16 @@
+# Here you can define all your datasets by using simple YAML syntax.
+#
+# Documentation for this file format can be found in "The Data Catalog"
+# Link: https://docs.kedro.org/en/stable/catalog-data/introduction/#data-catalog
+
+bdd_labels_train:
+  type: json.JSONDataset
+  filepath: data/02_intermediate/bdd_labels_train.json
+
+bdd_labels_val:
+  type: json.JSONDataset
+  filepath: data/02_intermediate/bdd_labels_val.json
+
+condition_counts:
+  type: pandas.CSVDataset
+  filepath: data/08_reporting/condition_counts.csv
