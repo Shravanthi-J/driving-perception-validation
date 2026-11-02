@@ -7,3 +7,8 @@
 data_prep:
   train_labels_dir: data/01_raw/bdd100k/raw_labels/train
   val_labels_dir: data/01_raw/bdd100k/raw_labels/val
+  classes: [car, person, truck, bus, motor, bike, rider, traffic light, traffic sign]
+  min_box_px: 2.0
+  IMG_W: 1280
+  IMG_H: 720
+  images_dir: data/01_raw/bdd100k/images
