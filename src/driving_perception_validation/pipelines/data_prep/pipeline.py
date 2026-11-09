@@ -4,7 +4,7 @@ generated using Kedro 1.7.0
 """
 
 from kedro.pipeline import Node, Pipeline, node  # noqa
-from .nodes import merge_label_files, summarize_conditions, items_to_tables, build_train_pool, build_test_pool
+from .nodes import merge_label_files, summarize_conditions, items_to_tables, build_train_pool, build_test_pool, split_dataset
 
 
 def create_pipeline(**kwargs) -> Pipeline:
@@ -49,4 +49,9 @@ def create_pipeline(**kwargs) -> Pipeline:
                 inputs=["val_images_raw", "val_boxes_raw", "params:data_prep"],
                 outputs=["test_pool_images", "test_pool_boxes"], 
                 name="build_test_pool"),
+            # 4. stratified, leakage-aware split
+            node(
+                func=split_dataset,
+                inputs=["train_pool_images", "train_pool_boxes", "test_pool_images", "test_pool_boxes", "params:data_prep"],
+                outputs=["images_manifest", "boxes_manifest"], name="split_dataset"),
     ])

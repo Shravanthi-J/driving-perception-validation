@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, List
 import pandas as pd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -133,3 +134,71 @@ def build_test_pool(images:pd.DataFrame, boxes:pd.DataFrame, params: dict):
     """Pool for the held-out test set (official VAL images)."""
     return _build_pool(images, boxes, Path(params["images_dir"]) / "val",
                        params["classes"], params["min_box_px"], params["IMG_W"], params["IMG_H"])
+
+def _stratified_sample(df:pd.DataFrame, no_of_rows:int, seed:int):
+    """Sample ~n rows keeping the (timeofday|weather) mix; rare strata keep >=1."""
+
+    rng = np.random.default_rng(seed)
+    no_of_rows = min(no_of_rows, len(df))
+    frac = no_of_rows / len(df)
+    sampled_data = []
+    for _, group_data in df.groupby("stratum"):
+        k = min(len(group_data), max(1, int(round(len(group_data) * frac)))) #when rounded grouped datapoints can become 0 so at max 1 need to be taken
+        sampled_data.append(group_data.sample(n=k, random_state=int(rng.integers(1_000_000_000))))
+    out = pd.concat(sampled_data)
+    if len(out) > no_of_rows:
+        output_df = out.sample(n=no_of_rows, random_state=seed)
+    return output_df.reset_index(drop=True)
+
+def _group_split(df:pd.DataFrame, val_frac:float, seed:int):
+    """
+    Split by video id within each stratum so no video spans train and val.
+    val_frac = 0.2. Two videos go to val, eight go to train, and all frames of each video follow it
+    Returns data frames : One for validation and one for train
+    """
+    rng = np.random.default_rng(seed)
+    val_videos = set()
+    for _, g in df.groupby("stratum"):
+        vids = g.video_id.unique()
+        rng.shuffle(vids)
+        k = int(round(len(vids) * val_frac))
+        val_videos.update(vids[:k])
+    is_val = df.video_id.isin(val_videos)
+    return df[~is_val].reset_index(drop=True), df[is_val].reset_index(drop=True)
+
+def _check_no_leakage(splits: dict):
+    names = list(splits)
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            overlap = set(splits[names[i]].video_id) & set(splits[names[j]].video_id)
+            assert not overlap, f"Video leakage between {names[i]} and {names[j]}: {len(overlap)} videos"
+    logger.info("Leakage check passed: no video id appears in more than one split.")
+ 
+ 
+def split_dataset(train_imgs:pd.DataFrame, train_boxes:pd.DataFrame, test_imgs:pd.DataFrame, test_boxes:pd.DataFrame, params: dict):
+    """Build train / val / test manifests (images and boxes, with a `split` column)."""
+    n_train, n_val, n_test, seed = (params[k] for k in ("n_train", "n_val", "n_test", "seed"))
+ 
+    sampled = _stratified_sample(train_imgs, n_train + n_val, seed)
+    train, val = _group_split(sampled, n_val / (n_train + n_val), seed)
+    test = _stratified_sample(test_imgs, n_test, seed + 1)
+ 
+    # (images, boxes pool, official image folder the files live in)
+    splits = {
+        "train": (train, train_boxes, "train"),
+        "val": (val, train_boxes, "train"),
+        "test": (test, test_boxes, "val"),
+    }
+    _check_no_leakage({k: v[0] for k, v in splits.items()})
+ 
+    img_parts, box_parts = [], []
+    for split, (imgs_df, pool_boxes, src_dir) in splits.items():
+        box_df = pool_boxes[pool_boxes.name.isin(imgs_df.name)]
+        counts = box_df.groupby("name").size()
+        img_parts.append(imgs_df.assign(
+            split=split, source_dir=src_dir,
+            n_boxes=imgs_df.name.map(counts).fillna(0).astype(int)))
+        box_parts.append(box_df.assign(split=split))
+        logger.info("%s: %d images, %d boxes", split, len(imgs_df), len(box_df))
+ 
+    return pd.concat(img_parts, ignore_index=True), pd.concat(box_parts, ignore_index=True)
