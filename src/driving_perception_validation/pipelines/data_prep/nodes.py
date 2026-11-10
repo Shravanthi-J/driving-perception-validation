@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, List
 import pandas as pd
 import numpy as np
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +178,7 @@ def _check_no_leakage(splits: dict):
  
 def split_dataset(train_imgs:pd.DataFrame, train_boxes:pd.DataFrame, test_imgs:pd.DataFrame, test_boxes:pd.DataFrame, params: dict):
     """Build train / val / test manifests (images and boxes, with a `split` column)."""
+    
     n_train, n_val, n_test, seed = (params[k] for k in ("n_train", "n_val", "n_test", "seed"))
  
     sampled = _stratified_sample(train_imgs, n_train + n_val, seed)
@@ -202,3 +204,44 @@ def split_dataset(train_imgs:pd.DataFrame, train_boxes:pd.DataFrame, test_imgs:p
         logger.info("%s: %d images, %d boxes", split, len(imgs_df), len(box_df))
  
     return pd.concat(img_parts, ignore_index=True), pd.concat(box_parts, ignore_index=True)
+
+def write_yolo_dataset(images_manifest, boxes_manifest, params: dict) -> str:
+    """Copy (or symlink) images and write YOLO labels + dataset.yaml. Returns the yaml path."""
+
+    out = Path(params["yolo_out_dir"])
+    classes = params["classes"]
+    class_to_id = {c: i for i, c in enumerate(classes)}
+    images_root = Path(params["images_dir"])
+ 
+    # Start clean so reruns with a different sample never leave stale files behind.
+    for sub in ("images", "labels"):
+        shutil.rmtree(out / sub, ignore_errors=True)
+    for split in ("train", "val", "test"):
+        (out / "images" / split).mkdir(parents=True, exist_ok=True)
+        (out / "labels" / split).mkdir(parents=True, exist_ok=True)
+ 
+    by_img = {k: g for k, g in boxes_manifest.groupby(["split", "name"])}
+    for row in images_manifest.itertuples():
+        src = (images_root / row.source_dir / row.name).resolve()
+        dst = out / "images" / row.split / row.name
+        if params["link_images"]:
+            dst.symlink_to(src)
+        else:
+            shutil.copy2(src, dst)
+ 
+        g = by_img[(row.split, row.name)]
+        cx = ((g.x1 + g.x2) / 2 / params["IMG_W"]).round(6)
+        cy = ((g.y1 + g.y2) / 2 / params["IMG_H"]).round(6)
+        w = (g.w / params["IMG_W"]).round(6)
+        h = (g.h / params["IMG_H"]).round(6)
+        cls = g.category.map(class_to_id)
+        lines = [f"{c} {x} {y} {ww} {hh}" for c, x, y, ww, hh in zip(cls, cx, cy, w, h)]
+        (out / "labels" / row.split / f"{Path(row.name).stem}.txt").write_text("\n".join(lines) + "\n")
+ 
+    yaml_lines = [
+        f"path: {out.resolve()}", "train: images/train", "val: images/val", "test: images/test", "names:",
+    ] + [f"  {i}: {c}" for i, c in enumerate(classes)]
+    yaml_path = out / "dataset.yaml"
+    yaml_path.write_text("\n".join(yaml_lines) + "\n")
+    logger.info("YOLO dataset written to %s", out.resolve())
+    return str(yaml_path)

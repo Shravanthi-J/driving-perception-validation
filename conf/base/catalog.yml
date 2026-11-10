@@ -14,3 +14,11 @@ bdd_labels_val:
 condition_counts:
   type: pandas.CSVDataset
   filepath: data/08_reporting/condition_counts.csv
+
+images_manifest:
+  type: pandas.CSVDataset
+  filepath: data/03_primary/images_manifest.csv
+
+boxes_manifest:
+  type: pandas.CSVDataset
+  filepath: data/03_primary/boxes_manifest.csv

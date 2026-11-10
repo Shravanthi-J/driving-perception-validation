@@ -16,4 +16,5 @@ data_prep:
   n_val: 1500
   n_test: 1500
   seed: 42
-  link_images: false
+  link_images: false #copies images instead of symlinking them. The subset is under 1 GB, and real files are safer for Azure ML uploads later
+  yolo_out_dir: data/03_primary/yolo_dataset
