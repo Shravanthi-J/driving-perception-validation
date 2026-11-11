@@ -245,3 +245,34 @@ def write_yolo_dataset(images_manifest, boxes_manifest, params: dict) -> str:
     yaml_path.write_text("\n".join(yaml_lines) + "\n")
     logger.info("YOLO dataset written to %s", out.resolve())
     return str(yaml_path)
+
+def make_data_report(images_manifest:pd.DataFrame, boxes_manifest:pd.DataFrame, params: dict) -> str:
+    """Markdown data report: size, class balance, conditions, small boxes, occlusion."""
+
+    classes = params["classes"]
+    img_tbl, box_tbl = images_manifest, boxes_manifest
+    lines = ["# BDD100K subset: data report\n"]
+ 
+    n_imgs = img_tbl.groupby("split").size().rename("images")
+    n_boxes = box_tbl.groupby("split").size().rename("boxes")
+    lines += ["## Size per split", "```", pd.concat([n_imgs, n_boxes], axis=1).to_string(), "```\n"]
+ 
+    cls_counts = box_tbl.pivot_table(index="category", columns="split", values="name",
+                                     aggfunc="count", fill_value=0).reindex(classes,fill_value=0)
+    cls_pct = (cls_counts / cls_counts.sum() * 100).round(1)
+    lines += ["## Class counts (boxes)", "```", cls_counts.to_string(), "```",
+              "## Class share per split (% of boxes)", "```", cls_pct.to_string(), "```\n"]
+ 
+    for col in ["timeofday", "weather", "scene"]:
+        t = pd.crosstab(img_tbl[col], img_tbl["split"], normalize="columns").mul(100).round(1)
+        counts = pd.crosstab(img_tbl[col], img_tbl["split"])
+        lines += [f"## {col}: % of images per split", "```", t.to_string(), "```",
+                  f"## {col}: image counts per split", "```", counts.to_string(), "```\n"]
+ 
+    small = (box_tbl.area < 32 * 32).groupby([box_tbl.split, box_tbl.category]).mean()
+    small = small.mul(100).round(1).unstack(0).reindex(classes, fill_value=0)
+    occ = box_tbl.groupby("category")[["occluded", "truncated"]].mean().mul(100).round(1).reindex(classes,fill_value=0)
+    lines += ["## Small boxes (<32x32 px), % per class and split", "```", small.to_string(), "```",
+              "## Occluded / truncated boxes, % per class", "```", occ.to_string(), "```\n"]
+ 
+    return "\n".join(lines)

@@ -4,7 +4,7 @@ generated using Kedro 1.7.0
 """
 
 from kedro.pipeline import Node, Pipeline, node  # noqa
-from .nodes import merge_label_files, summarize_conditions, items_to_tables, build_train_pool, build_test_pool, split_dataset, write_yolo_dataset
+from .nodes import merge_label_files, summarize_conditions, items_to_tables, build_train_pool, build_test_pool, split_dataset, write_yolo_dataset, make_data_report
 
 
 def create_pipeline(**kwargs) -> Pipeline:
@@ -61,5 +61,11 @@ def create_pipeline(**kwargs) -> Pipeline:
                 func=write_yolo_dataset, 
                 inputs=["images_manifest", "boxes_manifest", "params:data_prep"],
                 outputs="yolo_dataset_yaml", 
-                name="write_yolo_dataset")
+                name="write_yolo_dataset"),
+            # 6. report
+            node(
+                func=make_data_report,
+                inputs=["images_manifest", "boxes_manifest", "params:data_prep"],
+                outputs="data_report", 
+                name="make_data_report"),
     ])

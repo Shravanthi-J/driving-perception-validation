@@ -22,3 +22,7 @@ images_manifest:
 boxes_manifest:
   type: pandas.CSVDataset
   filepath: data/03_primary/boxes_manifest.csv
+
+data_report:
+  type: text.TextDataset
+  filepath: data/08_reporting/data_report.md
