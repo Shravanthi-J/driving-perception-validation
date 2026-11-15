@@ -14,6 +14,9 @@ dependencies = [
     "kedro~=1.7.0",
     "pandas>=2.3.3",
     "kedro-datasets>=9.6.0",
+    "mlflow>=3.18.0",
+    "torch>=2.14.1",
+    "ultralytics>=8.4.123",
 ]
 
 

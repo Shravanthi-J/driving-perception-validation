@@ -1,0 +1,21 @@
+# This is a boilerplate parameters config generated for pipeline 'training'
+# using Kedro 1.7.0.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://docs.kedro.org/en/1.7.0/configuration/parameters.html
+
+training:
+  data_yaml: data/03_primary/yolo_dataset/dataset.yaml
+  mlflow_tracking_uri: http://127.0.0.1:5001
+  experiment_name: bdd-detection
+  run_name: yolov8n_baseline
+  project_dir: data/06_models/yolo_runs
+  model: yolov8n.pt
+  epochs: 30
+  imgsz: 640
+  batch: 16
+  workers: 4
+  device: mps
+  seed: 42
+  fraction: 1.0
+  patience: 10
