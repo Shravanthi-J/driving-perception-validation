@@ -1,0 +1,13 @@
+# This is a boilerplate parameters config generated for pipeline 'model_selection'
+# using Kedro 1.7.0.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://docs.kedro.org/en/1.7.0/configuration/parameters.html
+
+
+model_selection:
+  mlflow_tracking_uri: http://127.0.0.1:5001
+  registered_model_name: bdd-yolo-detector
+  promotion_metric: val_map50_95
+  higher_is_better: true
+  min_delta: 0.0

@@ -30,3 +30,11 @@ data_report:
 training_result:
   type: json.JSONDataset
   filepath: data/06_models/training_result.json
+
+promotion_result:
+  type: json.JSONDataset
+  filepath: data/06_models/promotion_result.json
+
+test_result:
+  type: json.JSONDataset
+  filepath: data/08_reporting/test_result.json
