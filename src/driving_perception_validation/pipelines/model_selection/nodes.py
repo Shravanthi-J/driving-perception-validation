@@ -15,6 +15,8 @@ Flow
    and log the numbers to the champion's MLflow run. The test split is never
    used to choose between models.
 """
+
+
 import logging
 from pathlib import Path
 from typing import Any
@@ -25,6 +27,9 @@ from mlflow.tracking import MlflowClient
 from ultralytics import YOLO
 
 logger = logging.getLogger(__name__)
+
+# Shown as tags on the model version, so the registry page has the headline numbers.
+INFO_KEYS = ("val_map50_95", "val_map50", "val_loss", "best_epoch")
 
 
 def register_and_promote(training_result: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
@@ -43,7 +48,8 @@ def register_and_promote(training_result: dict[str, Any], params: dict[str, Any]
         client.create_registered_model(name)
 
     run_id = training_result["run_id"]
-    new_score = float(training_result["metrics"][metric])
+    run_metrics = training_result["metrics"]
+    new_score = float(run_metrics[metric])
 
     # Reuse the version if this run was already registered (safe to rerun the node).
     existing = [v for v in client.search_model_versions(f"name='{name}'") if v.run_id == run_id]
@@ -51,10 +57,9 @@ def register_and_promote(training_result: dict[str, Any], params: dict[str, Any]
         mv = existing[0]
     else:
         mv = client.create_model_version(name=name, source=f"runs:/{run_id}/weights", run_id=run_id)
-    for key in ("best_epoch", "val_loss", "val_map50"):
-        client.set_model_version_tag(name, mv.version, key, str(round(training_result["metrics"][key], 6)))
-    #client.set_model_version_tag(name, mv.version, metric, str(round(new_score, 6)))
-    client.set_registered_model_alias(name, "challenger", mv.version)
+    for key in INFO_KEYS:
+        if key in run_metrics:
+            client.set_model_version_tag(name, mv.version, key, str(round(float(run_metrics[key]), 6)))
 
     try:
         champion = client.get_model_version_by_alias(name, "champion")
@@ -62,30 +67,34 @@ def register_and_promote(training_result: dict[str, Any], params: dict[str, Any]
         champion = None
 
     champion_score = None
-    if champion is None:
-        promote, reason = True, "no champion yet"
-    elif champion.version == mv.version:
-        promote, reason = False, "this version is already the champion"
+    if champion is not None and str(champion.version) == str(mv.version):
+        # Rerun on the model that already is the champion: nothing to compare or change.
+        decision = "already champion (no change)"
+        reason = "this version already holds the champion alias"
     else:
-        champion_score = client.get_run(champion.run_id).data.metrics.get(metric)
-        if champion_score is None:
-            raise ValueError(f"Champion run {champion.run_id} has no metric '{metric}'")
-        delta = new_score - champion_score if higher_is_better else champion_score - new_score
-        promote = delta > min_delta
-        reason = f"{metric}: challenger {new_score:.4f} vs champion {champion_score:.4f}"
+        client.set_registered_model_alias(name, "challenger", mv.version)
+        if champion is None:
+            promote, reason = True, "no champion yet"
+        else:
+            champion_score = client.get_run(champion.run_id).data.metrics.get(metric)
+            if champion_score is None:
+                raise ValueError(f"Champion run {champion.run_id} has no metric '{metric}'")
+            delta = new_score - champion_score if higher_is_better else champion_score - new_score
+            promote = delta > min_delta
+            reason = f"{metric}: challenger {new_score:.4f} vs champion {champion_score:.4f}"
 
-    if promote:
-        client.set_registered_model_alias(name, "champion", mv.version)
-        try:
-            client.delete_registered_model_alias(name, "challenger")
-        except MlflowException:
-            pass
-        decision = "promoted to champion"
-    else:
-        decision = "kept as challenger"
+        if promote:
+            client.set_registered_model_alias(name, "champion", mv.version)
+            try:
+                client.delete_registered_model_alias(name, "challenger")
+            except MlflowException:
+                pass
+            decision = "promoted to champion"
+        else:
+            decision = "kept as challenger"
     client.set_model_version_tag(name, mv.version, "decision", decision)
 
-    logger.info("Version %s %s (%s)", mv.version, decision, reason)
+    logger.info("Version %s: %s (%s)", mv.version, decision, reason)
     return {
         "model_name": name,
         "version": str(mv.version),

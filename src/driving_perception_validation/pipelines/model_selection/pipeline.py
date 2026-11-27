@@ -14,10 +14,4 @@ def create_pipeline(**kwargs) -> Pipeline:
                 outputs="promotion_result",
                 name="register_and_promote",
             ),
-            node(
-                func=evaluate_champion_on_test,
-                inputs=["promotion_result", "params:model_selection", "params:training"],
-                outputs="test_result",
-                name="evaluate_champion_on_test",
-            ),
     ])
