@@ -1,0 +1,24 @@
+# This is a boilerplate parameters config generated for pipeline 'inference'
+# using Kedro 1.7.0.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://docs.kedro.org/en/1.7.0/configuration/parameters.html
+
+inference:
+  mlflow_tracking_uri: http://127.0.0.1:5001
+  registered_model_name: bdd-yolo-detector
+  alias: champion
+  split: val
+  yolo_dir: data/03_primary/yolo_dataset
+  conf: 0.05
+  vis_conf: 0.25
+  max_images: null
+  chunk_size: 64
+  seed: 42
+  visual_dir: data/08_reporting/inference_samples
+  n_per_query: 3
+  visual_queries:
+    - "timeofday == 'night'"
+    - "weather == 'rainy'"
+    - "weather == 'snowy'"
+    - "timeofday == 'daytime' and weather == 'clear'"

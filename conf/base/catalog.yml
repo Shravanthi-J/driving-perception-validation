@@ -38,3 +38,7 @@ promotion_result:
 test_result:
   type: json.JSONDataset
   filepath: data/08_reporting/test_result.json
+
+predictions:
+  type: pandas.CSVDataset
+  filepath: data/07_model_output/predictions.csv
